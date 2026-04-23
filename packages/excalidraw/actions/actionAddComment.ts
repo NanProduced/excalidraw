@@ -11,11 +11,11 @@ export const actionAddComment = register({
     action: "addComment",
   },
   perform(elements, appState, _formData, app) {
-    if (app.lastPointerMoveCoords) {
-      app.addCommentAtPosition(
-        app.lastPointerMoveCoords.x,
-        app.lastPointerMoveCoords.y,
-      );
+    const contextMenuCoords = (app as any).lastContextMenuSceneCoords;
+    const coords = contextMenuCoords || app.lastPointerMoveCoords;
+
+    if (coords) {
+      app.addCommentAtPosition(coords.x, coords.y);
     }
 
     return {

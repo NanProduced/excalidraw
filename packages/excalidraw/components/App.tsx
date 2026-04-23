@@ -461,6 +461,7 @@ import UnlockPopup from "./UnlockPopup";
 
 import { PinsContainer } from "./pin/Pin";
 import type { Pin, PinMap, PinId, PinDialogState } from "../pins/types";
+import { PIN_STORAGE_KEY } from "../pins/types";
 import {
   loadPinsFromStorage,
   createPin,
@@ -714,6 +715,7 @@ class App extends React.Component<AppProps, AppState> {
   private pins: PinMap = new Map();
   private selectedPinId: PinId | null = null;
   private pinDialogState: PinDialogState | null = null;
+  private lastContextMenuSceneCoords: { x: number; y: number } | null = null;
 
   animationFrameHandler = new AnimationFrameHandler();
 
@@ -2302,6 +2304,7 @@ class App extends React.Component<AppProps, AppState> {
                             onPinSave={this.handlePinSave}
                             onPinDelete={this.handlePinDelete}
                             onDialogClose={this.handlePinDialogClose}
+                            onDialogEdit={this.handlePinDialogEdit}
                             appState={{
                               zoom: this.state.zoom,
                               offsetLeft: this.state.offsetLeft,
@@ -12113,6 +12116,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     const { x, y } = viewportCoordsToSceneCoords(event, this.state);
+    this.lastContextMenuSceneCoords = { x, y };
     const element = this.getElementAtPosition(x, y, {
       preferSelected: true,
       includeLockedElements: true,
@@ -12519,6 +12523,14 @@ class App extends React.Component<AppProps, AppState> {
     this.triggerRender();
   };
 
+  public clearPins = () => {
+    this.pins = new Map();
+    this.selectedPinId = null;
+    this.pinDialogState = null;
+    localStorage.removeItem(PIN_STORAGE_KEY);
+    this.triggerRender();
+  };
+
   private handlePinClick = (pinId: PinId) => {
     this.selectedPinId = pinId;
     const pin = this.pins.get(pinId);
@@ -12545,10 +12557,25 @@ class App extends React.Component<AppProps, AppState> {
     this.triggerRender();
   };
 
-  private handlePinDialogClose = () => {
+  private handlePinDialogClose = (pinId: PinId, currentContent: string, isNew: boolean) => {
+    if (isNew && currentContent.trim() === "") {
+      this.pins = deletePin(this.pins, pinId);
+    }
     this.selectedPinId = null;
     this.pinDialogState = null;
     this.triggerRender();
+  };
+
+  private handlePinDialogEdit = (pinId: PinId) => {
+    const pin = this.pins.get(pinId);
+    if (pin) {
+      this.pinDialogState = {
+        pinId,
+        isEditing: true,
+        initialContent: pin.content,
+      };
+      this.triggerRender();
+    }
   };
 
   private getContextMenuItems = (
