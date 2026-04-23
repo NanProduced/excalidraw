@@ -63,9 +63,11 @@ export const PinComponent = ({
 interface PinDialogProps {
   pin: Pin;
   isEditing: boolean;
+  isNew: boolean;
   onSave: (pinId: PinId, content: string) => void;
   onDelete: (pinId: PinId) => void;
-  onClose: () => void;
+  onClose: (pinId: PinId, currentContent: string, isNew: boolean) => void;
+  onEdit: (pinId: PinId) => void;
   appState: {
     zoom: Zoom;
     offsetLeft: number;
@@ -84,9 +86,11 @@ const PIN_OFFSET_Y = 40;
 export const PinDialog = ({
   pin,
   isEditing,
+  isNew,
   onSave,
   onDelete,
   onClose,
+  onEdit,
   appState,
 }: PinDialogProps) => {
   const [content, setContent] = React.useState(pin.content);
@@ -103,14 +107,20 @@ export const PinDialog = ({
     onSave(pin.id, content);
   };
 
+  const handleClose = () => {
+    onClose(pin.id, content, isNew);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.stopPropagation();
-      onClose();
+      handleClose();
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
-      handleSave();
+      if (isEditing) {
+        handleSave();
+      }
     }
   };
 
@@ -146,6 +156,7 @@ export const PinDialog = ({
       }}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={handleKeyDown}
+      tabIndex={-1}
     >
       <div className="excalidraw-pin-dialog__header">
         <h3 className="excalidraw-pin-dialog__title">
@@ -153,7 +164,7 @@ export const PinDialog = ({
         </h3>
         <button
           className="excalidraw-pin-dialog__close"
-          onClick={onClose}
+          onClick={handleClose}
           type="button"
           aria-label={t("buttons.close")}
         >
@@ -172,7 +183,7 @@ export const PinDialog = ({
             onKeyDown={handleKeyDown}
           />
         ) : (
-          <div className="excalidraw-pin-dialog__content">
+          <div className="excalidraw-pin-dialog__content-text">
             {pin.content || (
               <span style={{ color: "var(--color-gray-5)" }}>
                 {t("labels.noComment")}
@@ -191,7 +202,7 @@ export const PinDialog = ({
             <>
               <button
                 className="excalidraw-pin-dialog__btn excalidraw-pin-dialog__btn--secondary"
-                onClick={onClose}
+                onClick={handleClose}
                 type="button"
               >
                 {t("buttons.cancel")}
@@ -215,9 +226,7 @@ export const PinDialog = ({
               </button>
               <button
                 className="excalidraw-pin-dialog__btn excalidraw-pin-dialog__btn--primary"
-                onClick={() => {
-                  setContent(pin.content);
-                }}
+                onClick={() => onEdit(pin.id)}
                 type="button"
               >
                 {t("buttons.edit")}
@@ -237,7 +246,8 @@ interface PinsContainerProps {
   onPinClick: (pinId: PinId) => void;
   onPinSave: (pinId: PinId, content: string) => void;
   onPinDelete: (pinId: PinId) => void;
-  onDialogClose: () => void;
+  onDialogClose: (pinId: PinId, currentContent: string, isNew: boolean) => void;
+  onDialogEdit: (pinId: PinId) => void;
   appState: {
     zoom: Zoom;
     offsetLeft: number;
@@ -258,12 +268,9 @@ export const PinsContainer = ({
   onPinSave,
   onPinDelete,
   onDialogClose,
+  onDialogEdit,
   appState,
 }: PinsContainerProps) => {
-  if (appState.contextMenu) {
-    return null;
-  }
-
   const selectedPin = selectedPinId ? pins.get(selectedPinId) : null;
 
   return (
@@ -282,9 +289,11 @@ export const PinsContainer = ({
         <PinDialog
           pin={selectedPin}
           isEditing={pinDialogState.isEditing}
+          isNew={pinDialogState.initialContent === "" && selectedPin.content === ""}
           onSave={onPinSave}
           onDelete={onPinDelete}
           onClose={onDialogClose}
+          onEdit={onDialogEdit}
           appState={appState}
         />
       )}
