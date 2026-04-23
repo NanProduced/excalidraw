@@ -831,6 +831,8 @@ export type AppClassProperties = {
   lastPointerMoveCoords: App["lastPointerMoveCoords"];
   bindModeHandler: App["bindModeHandler"];
 
+  addCommentAtPosition: App["addCommentAtPosition"];
+
   setAppState: App["setAppState"];
 };
 

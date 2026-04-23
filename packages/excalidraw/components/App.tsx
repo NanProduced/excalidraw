@@ -324,6 +324,7 @@ import {
   actionToggleArrowBinding,
   actionToggleMidpointSnapping,
   actionToggleCropEditor,
+  actionAddComment,
 } from "../actions";
 import { actionWrapTextInContainer } from "../actions/actionBoundText";
 import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
@@ -457,6 +458,16 @@ import { AppStateObserver, type OnStateChange } from "./AppStateObserver";
 import { findShapeByKey } from "./shapes";
 
 import UnlockPopup from "./UnlockPopup";
+
+import { PinsContainer } from "./pin/Pin";
+import type { Pin, PinMap, PinId, PinDialogState } from "../pins/types";
+import {
+  loadPinsFromStorage,
+  createPin,
+  addPin,
+  updatePin,
+  deletePin,
+} from "../pins/pinStore";
 
 import type { ExcalidrawLibraryIds } from "../data/types";
 
@@ -699,6 +710,10 @@ class App extends React.Component<AppProps, AppState> {
   /** previous frame pointer coords */
   previousPointerMoveCoords: { x: number; y: number } | null = null;
   lastViewportPosition = { x: 0, y: 0 };
+
+  private pins: PinMap = new Map();
+  private selectedPinId: PinId | null = null;
+  private pinDialogState: PinDialogState | null = null;
 
   animationFrameHandler = new AnimationFrameHandler();
 
@@ -2279,6 +2294,26 @@ class App extends React.Component<AppProps, AppState> {
                               </ElementCanvasButtons>
                             )}
 
+                          <PinsContainer
+                            pins={this.pins}
+                            selectedPinId={this.selectedPinId}
+                            pinDialogState={this.pinDialogState}
+                            onPinClick={this.handlePinClick}
+                            onPinSave={this.handlePinSave}
+                            onPinDelete={this.handlePinDelete}
+                            onDialogClose={this.handlePinDialogClose}
+                            appState={{
+                              zoom: this.state.zoom,
+                              offsetLeft: this.state.offsetLeft,
+                              offsetTop: this.state.offsetTop,
+                              scrollX: this.state.scrollX,
+                              scrollY: this.state.scrollY,
+                              width: this.state.width,
+                              height: this.state.height,
+                              contextMenu: this.state.contextMenu,
+                            }}
+                          />
+
                           {this.state.contextMenu && (
                             <ContextMenu
                               items={this.state.contextMenu.items}
@@ -3109,6 +3144,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     this.scene.onUpdate(this.triggerRender);
+    this.pins = loadPinsFromStorage();
     this.addEventListeners();
 
     if (this.props.autoFocus && this.excalidrawContainerRef.current) {
@@ -12471,6 +12507,50 @@ class App extends React.Component<AppProps, AppState> {
     return false;
   };
 
+  public addCommentAtPosition = (sceneX: number, sceneY: number) => {
+    const newPin = createPin(sceneX, sceneY);
+    this.pins = addPin(this.pins, newPin);
+    this.selectedPinId = newPin.id;
+    this.pinDialogState = {
+      pinId: newPin.id,
+      isEditing: true,
+      initialContent: "",
+    };
+    this.triggerRender();
+  };
+
+  private handlePinClick = (pinId: PinId) => {
+    this.selectedPinId = pinId;
+    const pin = this.pins.get(pinId);
+    if (pin) {
+      this.pinDialogState = {
+        pinId,
+        isEditing: false,
+        initialContent: pin.content,
+      };
+    }
+    this.triggerRender();
+  };
+
+  private handlePinSave = (pinId: PinId, content: string) => {
+    this.pins = updatePin(this.pins, pinId, { content });
+    this.pinDialogState = null;
+    this.triggerRender();
+  };
+
+  private handlePinDelete = (pinId: PinId) => {
+    this.pins = deletePin(this.pins, pinId);
+    this.selectedPinId = null;
+    this.pinDialogState = null;
+    this.triggerRender();
+  };
+
+  private handlePinDialogClose = () => {
+    this.selectedPinId = null;
+    this.pinDialogState = null;
+    this.triggerRender();
+  };
+
   private getContextMenuItems = (
     type: "canvas" | "element",
   ): ContextMenuItems => {
@@ -12485,6 +12565,8 @@ class App extends React.Component<AppProps, AppState> {
       if (this.state.viewModeEnabled) {
         return [
           ...options,
+          actionAddComment,
+          CONTEXT_MENU_SEPARATOR,
           actionToggleGridMode,
           actionToggleZenMode,
           actionToggleViewMode,
@@ -12494,6 +12576,8 @@ class App extends React.Component<AppProps, AppState> {
 
       return [
         actionPaste,
+        CONTEXT_MENU_SEPARATOR,
+        actionAddComment,
         CONTEXT_MENU_SEPARATOR,
         actionCopyAsPng,
         actionCopyAsSvg,
